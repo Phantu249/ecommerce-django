@@ -17,6 +17,8 @@ db.sqlite3
 # Media / Static files
 /media/
 /staticfiles/
+**/media/
+
 
 # Migrations
 **/migrations/*
@@ -37,3 +39,5 @@ build/
 # Others
 .DS_Store
 Thumbs.db
+/product/media/
+/product/media/
