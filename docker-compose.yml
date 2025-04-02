@@ -1,6 +1,25 @@
 version: '3.8'
 
 services:
+  mongodb:
+    image: mongo
+    restart: always
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD}
+    volumes:
+      - mongo-data:/data/db
+    ports:
+      - "27017:27017"
+    command: mongod --quiet
+    healthcheck:
+      test: ["CMD", "mongosh", "--username", "${MONGO_USER}", "--password", "${MONGO_PASSWORD}", "--authenticationDatabase", "admin", "--eval", "db.adminCommand('ping')"]
+      interval: 20s
+      timeout: 10s
+      retries: 5
+      start_period: 20s  # Thêm thời gian khởi động ban đầu
+
+
   db:
     image: mysql:8.0
     environment:
@@ -40,5 +59,31 @@ services:
              python manage.py migrate &&
              python manage.py runserver 0.0.0.0:8000"
 
+
+
+  product-service:
+    build:
+      context: ./product
+      dockerfile: Dockerfile
+    volumes:
+      - ./product:/app
+    ports:
+      - "8001:8001"  # Chạy trên cổng 8001 để không xung đột với user-service
+    environment:
+      - MONGO_HOST=${MONGO_HOST}
+      - MONGO_PORT=${MONGO_PORT}
+      - MONGO_USER=${MONGO_USER}
+      - MONGO_PASSWORD=${MONGO_PASSWORD}
+      - MONGO_DB=${MONGO_DB}
+      - USER_SERVICE_URL=${USER_SERVICE_URL}
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    command: >
+      sh -c "python manage.py makemigrations &&
+             python manage.py migrate &&
+             python manage.py runserver 0.0.0.0:8001"
+
 volumes:
   mysql-data:
+  mongo-data:
