@@ -177,7 +177,67 @@ class OrderCancelAPIView(APIView):
             order.save()
             return Response({"detail": "Order cancelled successfully."}, status=status.HTTP_200_OK)
         return Response({"detail": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
+    
+class OrderStateHistoryView(APIView):
+    """
+    API View to get order state history
+    """
 
+    def get(self, request, *args, **kwargs):
+        auth_token = request.headers.get('AUTHORIZATION')
+        user = get_user_info(auth_token)
+        if not user:
+            return Response({"detail": "Invalid user data"}, status=status.HTTP_400_BAD_REQUEST)
+        order_id = self.kwargs.get('order_id')
+        order = Order.objects.filter(order_id = order_id)
+
+        if not order:
+            return Response({"detail": "Order not found"}, status=status.HTTP_404_NOT_FOUND)
+        elif order.user_id is not user.get('id') or user.get('role').get('name') != 'admin':
+            return Response({"detail": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
+
+        order_states = OrderStateHistory.objects.filter(order_id = order_id)
+
+        content = []
+
+        for state in order_states:
+            orderStateSerializer = OrderStateSerializer(data=state.order_state)
+            res = {
+                "created_at": state.created_at,
+                "id": state.id,
+                "order_state": orderStateSerializer.data,
+            }
+
+            content.append(OrderStateHistorySerializer(data=res))
+
+        return Response(content, status.HTTP_200_OK)
+
+class ApproveOrderView(APIView):
+    
+    def post(self, request, *args, **kwargs):
+        """
+        Xác nhận đơn hàng.
+        """
+        auth_token = request.headers.get('AUTHORIZATION')
+        state = StateSerializer(request.data)
+
+        state = state.is_valid().get('state')
+        user = get_user_info(auth_token)
+        if not user:
+            return Response({"detail": "Invalid user data"}, status=status.HTTP_400_BAD_REQUEST)
+
+        order_id = self.kwargs.get('order_id')
+        order = Order.objects.filter(id=order_id).first()
+        if not order:
+            return Response({"detail": "Order not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        if user.get('role').get('name') == 'admin':
+            order.order_state = OrderState.objects.get(id=state)
+            order.save()
+            return Response({"detail": "Order approved successfully."}, status=status.HTTP_200_OK)
+
+        return Response({"detail": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
+    
 def get_orders_by_user(user_id, page, per_page):
     """
     Lấy danh sách đơn hàng của một người dùng cụ thể.

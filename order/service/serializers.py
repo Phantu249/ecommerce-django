@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Order, OrderState, OrderItem
+from .models import Order, OrderState, OrderItem, OrderStateHistory
 
 class OrderStateSerializer(serializers.ModelSerializer):
     class Meta:
@@ -106,6 +106,15 @@ class OrderResponseSerializer(serializers.ModelSerializer):
     payment_state = PaymentStateSerializer()
     items = OrderItemRequestSerializer(many=True, required=True)
     order_state = OrderStateSerializer()
+
+class OrderStateHistorySerializer(serializers.Serializer):
+    class Meta:
+        model: OrderStateHistory
+        fields = ['created_at', 'id']
+    order_state = OrderStateSerializer()
+
+class StateSerializer(serializers.Serializer): 
+    state = serializers.CharField()
 
 class PageSerializer(serializers.Serializer):
     page = serializers.IntegerField(min_value=1, required=True)  # Current page number
