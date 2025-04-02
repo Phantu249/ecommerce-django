@@ -9,7 +9,7 @@ from rest_framework import status
 import requests
 from django.conf import settings
 from .models import Cart, CartItem
-from .serializers import CartSerializer, CartISerializer, CartItemSerializer
+from .serializers import CartSerializer, CartItemSerializer
 from .permissions import IsAuth
 
 
