@@ -93,7 +93,6 @@ class ProductCreateUpdateSerializer(serializers.ModelSerializer):
 
         # Lưu ảnh vào media/product_images
         for image in product_images:
-            print("receive", image.name)
             file_path = os.path.join(settings.MEDIA_ROOT, 'product_images', image.name)
             os.makedirs(os.path.dirname(file_path), exist_ok=True)
             with open(file_path, 'wb+') as destination:

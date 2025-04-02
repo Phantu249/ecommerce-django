@@ -37,7 +37,7 @@ class Category(models.Model):
 class Product(models.Model):
     id = models.IntegerField(primary_key=True)
     name = models.CharField(max_length=255)
-    price = models.IntegerField()
+    price = models.FloatField(default=0.0)
     description = models.CharField(max_length=255)
     category_id = models.IntegerField()
     stock = models.IntegerField()

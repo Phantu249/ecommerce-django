@@ -75,7 +75,7 @@ class ProductListView(APIView):
 
     def post(self, request):
         permission_classes = [IsAdminRole]
-
+        print(request.data)
         serializer = ProductCreateUpdateSerializer(data=request.data, context={'request': request})
         if serializer.is_valid():
             product = serializer.save()
@@ -85,7 +85,6 @@ class ProductListView(APIView):
     def delete(self, request):
         permission_classes = [IsAdminRole]
 
-        print(request.data)
         list_product_id = request.data
         success = []
         failure = []

@@ -1,14 +1,16 @@
 version: '3.8'
 
 services:
-  mongodb:
+  mongo-product-db:
+    container_name: mongo-product-db
     image: mongo
     restart: always
     environment:
       MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER}
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD}
+      MONGO_INITDB_DATABASE: ${MONGO_DB}
     volumes:
-      - mongo-data:/data/db
+      - mongo-product-data:/data/db
     ports:
       - "27017:27017"
     command: mongod --quiet
@@ -20,7 +22,8 @@ services:
       start_period: 20s  # Thêm thời gian khởi động ban đầu
 
 
-  db:
+  mysql-user-db:
+    container_name: mysql-user-db
     image: mysql:8.0
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
@@ -28,7 +31,7 @@ services:
       MYSQL_USER: ${MYSQL_USER}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
     volumes:
-      - mysql-data:/var/lib/mysql
+      - mysql-user-data:/var/lib/mysql
     ports:
       - "3306:3306"
     healthcheck:
@@ -37,7 +40,21 @@ services:
       timeout: 5s
       retries: 5
 
+  postgres-cart-db:
+    container_name: postgres-cart-db
+    image: postgres:15
+    environment:
+      - POSTGRES_DB=${POSTGRES_NAME}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+
+    ports:
+        - "5432:5432"
+    volumes:
+      - postgres-cart-data:/var/lib/postgresql/data
+
   user-service:
+    container_name: user-service
     build:
       context: ./user
       dockerfile: Dockerfile
@@ -52,16 +69,15 @@ services:
       - MYSQL_HOST=${MYSQL_HOST}
       - MYSQL_PORT=${MYSQL_PORT}
     depends_on:
-      db:
+      mysql-user-db:
         condition: service_healthy
     command: >
       sh -c "python manage.py makemigrations &&
              python manage.py migrate &&
              python manage.py runserver 0.0.0.0:8000"
 
-
-
   product-service:
+    container_name: product-service
     build:
       context: ./product
       dockerfile: Dockerfile
@@ -77,13 +93,39 @@ services:
       - MONGO_DB=${MONGO_DB}
       - USER_SERVICE_URL=${USER_SERVICE_URL}
     depends_on:
-      mongodb:
+      mongo-product-db:
         condition: service_healthy
     command: >
       sh -c "python manage.py makemigrations &&
              python manage.py migrate &&
              python manage.py runserver 0.0.0.0:8001"
 
+  cart_service:
+    container_name: cart-service
+    build:
+      context: ./cart
+      dockerfile: Dockerfile
+    command: >
+      sh -c "python manage.py makemigrations &&
+             python manage.py migrate &&
+             python manage.py runserver 0.0.0.0:8002"
+    volumes:
+      - ./cart:/app
+    ports:
+      - "8002:8002"
+    depends_on:
+      - postgres-cart-db
+    environment:
+      - DATABASE_HOST=${POSTGRES_HOST}
+      - DATABASE_PORT=${POSTGRES_PORT}
+      - DATABASE_NAME=${POSTGRES_NAME}
+      - DATABASE_USER=${POSTGRES_USER}
+      - DATABASE_PASSWORD=${POSTGRES_PASSWORD}
+      - USER_SERVICE_URL=${USER_SERVICE_URL}
+      - PRODUCT_SERVICE_URL=${PRODUCT_SERVICE_URL}
+      - ORDER_SERVICE_URL=${ORDER_SERVICE_URL}
+
 volumes:
-  mysql-data:
-  mongo-data:
+  mysql-user-data:
+  mongo-product-data:
+  postgres-cart-data:
