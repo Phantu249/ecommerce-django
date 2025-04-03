@@ -175,7 +175,7 @@ services:
     volumes:
       - ./payment:/app
     ports:
-      - "8003:8003"
+      - "8004:8004"
     environment:
       - POSTGRES_DB=${PAYMENT_POSTGRES_DB}
       - POSTGRES_USER=${PAYMENT_POSTGRES_USER}
