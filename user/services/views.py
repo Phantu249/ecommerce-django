@@ -105,10 +105,8 @@ class GetWardsView(APIView):
     def get(self, request):
         id = request.query_params.get('id')
         if id:
-            wards = Ward.objects.filter(id=id)
-            if not wards.exists():
-                return Response({'error': 'Ward not found'}, status=status.HTTP_404_NOT_FOUND)
-            serializer = WardSerializer(wards, many=True)
+            ward = get_object_or_404(Ward, id=id)
+            serializer = WardSerializer(ward)
             return Response(serializer.data, status=status.HTTP_200_OK)
         else:
             page = request.query_params.get('page', 1)
