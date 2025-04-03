@@ -155,6 +155,7 @@ services:
       - POSTGRES_PORT=${POSTGRES_PORT}
       - USER_SERVICE_URL=${USER_SERVICE_URL}
       - PRODUCT_SERVICE_URL=${PRODUCT_SERVICE_URL}
+      - PAYMENT_SERVICE_URL=${PAYMENT_SERVICE_URL}
     depends_on:
       postgres:
         condition: service_healthy
@@ -167,6 +168,27 @@ services:
              python manage.py migrate &&
              python manage.py runserver 0.0.0.0:8002"
 
+  payment-service:
+    build:
+      context: ./payment
+      dockerfile: Dockerfile
+    volumes:
+      - ./payment:/app
+    ports:
+      - "8003:8003"
+    environment:
+      - POSTGRES_DB=${PAYMENT_POSTGRES_DB}
+      - POSTGRES_USER=${PAYMENT_POSTGRES_USER}
+      - POSTGRES_PASSWORD=${PAYMENT_POSTGRES_PASSWORD}
+      - POSTGRES_HOST=${PAYMENT_POSTGRES_HOST}
+      - POSTGRES_PORT=${PAYMENT_POSTGRES_PORT}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: >
+      sh -c "python manage.py makemigrations services &&
+             python manage.py migrate services &&
+             python manage.py runserver 0.0.0.0:8003"
 volumes:
   mongo-product-data:
   mysql-user-data:

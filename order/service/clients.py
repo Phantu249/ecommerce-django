@@ -1,11 +1,11 @@
 import httpx
 import os
 from .serializers import *
-from django.conf import settings
+from order.settings import USER_SERVICE_URL, PRODUCT_SERVICE_URL, PAYMENT_SERVICE_URL
 
 def get_user_info(token: str):
-    auth_service_url = f"{settings.USER_SERVICE_URL}/get_user_info"
-    print(f"Auth service URL: {auth_service_url}")
+    auth_service_url = f"{USER_SERVICE_URL}/get-user-info"
+    print(f"Token: {token}")
     try:
         headers = {"Authorization": f"{token}", "Content-Type": "application/json", "Cross-Service": "order-service"}
         response = httpx.get(auth_service_url, headers=headers)
@@ -18,7 +18,7 @@ def get_user_info(token: str):
         return None
 
 def get_user_info_by_user_id(token: str, user_id: int):
-    auth_service_url = f"{settings.USER_SERVICE_URL}/{user_id}"
+    auth_service_url = f"{USER_SERVICE_URL}/{user_id}"
     try:
         headers = {"Authorization": f"{token}", "Content-Type": "application/json", "Cross-Service": "order-service"}
         response = httpx.get(auth_service_url, headers=headers)
@@ -31,7 +31,7 @@ def get_user_info_by_user_id(token: str, user_id: int):
         return None
 
 def get_product_by_id(product_id):
-    product_service_url = f"{settings.PRODUCT_SERVICE_URL}/{product_id}?detail=true"
+    product_service_url = f"{PRODUCT_SERVICE_URL}/{product_id}?detail=True"
     try:
         response = httpx.get(product_service_url)
         if response.status_code == 200:
@@ -43,7 +43,7 @@ def get_product_by_id(product_id):
         return None
 
 def get_payment_state(auth_token, payment_state_id):
-    payment_service_url = f"http://localhost:8087/api/payment/{payment_state_id}"
+    payment_service_url = f"{PAYMENT_SERVICE_URL}/{payment_state_id}"
     try:
         headers = {"Authorization": f"Bearer {auth_token}", "Content-Type": "application/json"}
         response = httpx.get(payment_service_url, headers=headers)
@@ -56,7 +56,7 @@ def get_payment_state(auth_token, payment_state_id):
         return None
 
 def get_payment_method(auth_token, payment_method_id):
-    payment_service_url = f"http://localhost:8087/api/payment/method/{payment_method_id}"
+    payment_service_url = f"{PAYMENT_SERVICE_URL}/method/{payment_method_id}"
     try:
         headers = {"Authorization": f"Bearer {auth_token}", "Content-Type": "application/json"}
         response = httpx.get(payment_service_url, headers=headers)
@@ -69,7 +69,7 @@ def get_payment_method(auth_token, payment_method_id):
         return None
 
 def get_payment_state_by_name(auth_token, payment_state_name):
-    payment_service_url = f"http://localhost:8087/api/payment/state?name={payment_state_name}"
+    payment_service_url = f"{PAYMENT_SERVICE_URL}/state?name={payment_state_name}"
     try:
         headers = {"Authorization": f"Bearer {auth_token}", "Content-Type": "application/json"}
         response = httpx.get(payment_service_url, headers=headers)
@@ -82,7 +82,7 @@ def get_payment_state_by_name(auth_token, payment_state_name):
         return None
 
 def get_address_by_ward(auth_token, ward_id):
-    address_service_url = f"{settings.USER_SERVICE_URL}/address/ward/{ward_id}"
+    address_service_url = f"{USER_SERVICE_URL}/address/ward/{ward_id}"
     try:
         headers = {"Authorization": f"{auth_token}", "Content-Type": "application/json", "Cross-Service": "order-service"}
         response = httpx.get(address_service_url, headers=headers)
@@ -107,9 +107,7 @@ def get_orders_by_user(user_id, page, per_page):
             "created_at": order.created_at,
             "ward_id": order.ward_id,
             "address": order.address,
-            "order_state_id": order.order_state_id,
-            "payment_state_id": order.payment_state_id,
-            "payment_method_id": order.payment_method_id,
+            "order_state": order.order_state,
         }
         for order in orders[start:end]
     ]
@@ -122,7 +120,19 @@ def get_orders_by_user(user_id, page, per_page):
 
 def get_order_items_by_order(order_id):
     order_items = OrderItem.objects.filter(order_id=order_id)
-    return [OrderItemResponseSerializer(item).data for item in order_items]
+    items = []
+    for item in order_items:
+        product = get_product_by_id(item.product_id)
+        print(f"Product: {product}")
+        productSerializer = ProductSerializer(data=product)
+        if productSerializer.is_valid():
+            items.append({
+                "id": item.id,
+                "quantity": item.quantity,
+                "product": productSerializer.data,
+                "price": item.price,
+            })
+    return [OrderItemResponseSerializer(data=item).data for item in items]
 
 def get_address_by_ward_id(token, ward_id, detail):
     ward_data = get_address_by_ward(token, ward_id)

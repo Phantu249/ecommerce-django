@@ -197,3 +197,22 @@ class ProductStockView(APIView):
             return Response(status=status.HTTP_202_ACCEPTED)
         except Product.DoesNotExist:
             return Response(status=status.HTTP_404_NOT_FOUND)
+        
+class ProductChangeStockView(APIView):
+    def post(self, request):
+        try:
+
+            items = request.data
+            for item in items:
+                product = Product.objects.get(id=int(item['id']))
+                stock = item.get('stock', 0)
+                if product.stock < int(stock):
+                    return Response(status=status.HTTP_400_BAD_REQUEST)
+            for item in items:
+                product = Product.objects.get(id=int(item['id']))
+                stock = item.get('stock', 0)
+                product.stock += int(stock)
+                product.save()
+            return Response(status=status.HTTP_200_OK)
+        except Product.DoesNotExist:
+            return Response(status=status.HTTP_404_NOT_FOUND)

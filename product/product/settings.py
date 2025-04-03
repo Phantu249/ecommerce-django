@@ -46,7 +46,7 @@ CORS_ALLOW_METHODS = ['*']
 
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 #Service url
-USER_SERVICE_URL = os.getenv('USER_SERVICE_URL', 'http://localhost:8000/api/user')
+USER_SERVICE_URL = os.getenv('USER_SERVICE_URL', 'http://user-service:8000/api/user')
 CART_SERVICE_URL = os.getenv('CART_SERVICE_URL', 'http://localhost:8003/api/cart')
 ORDER_SERVICE_URL = os.getenv('ORDER_SERVICE_URL', 'http://localhost:8004/api/order')
 

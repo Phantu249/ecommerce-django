@@ -4,8 +4,9 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Lấy URL của các dịch vụ từ biến môi trường
-USER_SERVICE_URL = os.getenv('USER_SERVICE_URL')
-PRODUCT_SERVICE_URL = os.getenv('PRODUCT_SERVICE_URL')
+USER_SERVICE_URL = 'http://localhost:8000/api/user'
+PRODUCT_SERVICE_URL = 'http://localhost:8001/api/product'
+PAYMENT_SERVICE_URL = 'http://localhost:8003/api/payment'
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -68,8 +69,7 @@ DATABASES = {
         'NAME': os.getenv('POSTGRES_DB'),
         'USER': os.getenv('POSTGRES_USER'),
         'PASSWORD': os.getenv('POSTGRES_PASSWORD'),
-        # 'HOST': 'localhost', 
-        'HOST': os.getenv('POSTGRES_HOST'),  # Hoặc tên dịch vụ trong Docker Compose
+        'HOST': 'localhost',  # Hoặc tên dịch vụ trong Docker Compose
         'PORT': os.getenv('POSTGRES_PORT'),
     }
 }

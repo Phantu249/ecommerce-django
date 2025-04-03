@@ -4,7 +4,7 @@ from .models import Order, OrderState, OrderItem, OrderStateHistory
 class OrderStateSerializer(serializers.ModelSerializer):
     class Meta:
         model = OrderState
-        fields = "__all__"
+        fields = ['id', 'name']
 
 class PaymentMethodSerializer(serializers.Serializer):
     id = serializers.IntegerField(required=True)
@@ -16,8 +16,8 @@ class PaymentStateSerializer(serializers.Serializer):
 
 class NameSerializer(serializers.Serializer):
     id = serializers.IntegerField(required=True)
-    first_name = serializers.CharField(max_length=50, required=True)
-    last_name = serializers.CharField(max_length=50, required=True)
+    first_name = serializers.CharField(max_length=50, allow_blank=True, required=False)
+    last_name = serializers.CharField(max_length=50, allow_blank=True, required=False)
 
 class RoleSerializer(serializers.Serializer):
     id = serializers.IntegerField(required=True)
@@ -30,26 +30,26 @@ class ProductImageSerializer(serializers.Serializer):
 class CategorySerializer(serializers.Serializer):
     id = serializers.IntegerField(required=True)
     name = serializers.CharField(max_length=50, required=True)
-    description = serializers.CharField(max_length=255, required=True)
+    is_active = serializers.BooleanField()
 
 class ProductSerializer(serializers.Serializer):
-    id = serializers.IntegerField(required=True)
-    name = serializers.CharField(max_length=50, required=True)
-    price = serializers.DecimalField(max_digits=10, decimal_places=2, required=True)
-    product_image = ProductImageSerializer(many=True, required=True)
-    description = serializers.CharField(max_length=255, required=True)
+    id = serializers.IntegerField()
+    name = serializers.CharField(max_length=50)
+    price = serializers.DecimalField(max_digits=10, decimal_places=2)
+    img_url = ProductImageSerializer(many=True)
+    description = serializers.CharField(max_length=255)
     stock = serializers.IntegerField(required=True, min_value=0)
-    category = CategorySerializer(required=True)
+    category = CategorySerializer()
+    is_active = serializers.BooleanField()
 
 class OrderItemRequestSerializer(serializers.Serializer):
     product_id = serializers.IntegerField(required=True)
     quantity = serializers.IntegerField(required=True, min_value=1)
     price = serializers.DecimalField(max_digits=10, decimal_places=2, required=True)
 
-class OrderItemResponseSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = OrderItem
-        fields = ['quantity', 'price']
+class OrderItemResponseSerializer(serializers.Serializer):
+    quantity = serializers.IntegerField(required=True)
+    price = serializers.DecimalField(max_digits=10, decimal_places=2, required=True)
     product = ProductSerializer()
 
 class CitySerializer(serializers.Serializer):
@@ -81,9 +81,9 @@ class AddressRequestOrderSerializer(serializers.Serializer):
 
 class UserSerializer(serializers.Serializer):
     id = serializers.IntegerField(required=True)
-    name = serializers.CharField(max_length=50, required=True)
+    username = serializers.CharField(max_length=50, required=True)
     email = serializers.EmailField(required=True)
-    address = AddressUserSerializer()
+    address = AddressUserSerializer(required=False, allow_null=True)
     phone_number = serializers.CharField(max_length=10, required=True)
     name = NameSerializer()
     role = RoleSerializer()
@@ -102,8 +102,6 @@ class OrderResponseSerializer(serializers.ModelSerializer):
     address = AddressSerializer()
     order_state = OrderStateSerializer()
     user = UserSerializer()
-    payment_method = PaymentMethodSerializer()
-    payment_state = PaymentStateSerializer()
     items = OrderItemRequestSerializer(many=True, required=True)
     order_state = OrderStateSerializer()
 

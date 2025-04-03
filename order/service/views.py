@@ -10,11 +10,9 @@ from .clients import (
     get_address_by_ward_id, get_user_by_id, get_payment_state,
     get_payment_method, get_payment_state_by_name, get_address_by_ward
 )
-import os
+from order.settings import PRODUCT_SERVICE_URL, PAYMENT_SERVICE_URL
 import logging
-
-# Lấy URL của product-service từ biến môi trường
-PRODUCT_SERVICE_URL = os.getenv('PRODUCT_SERVICE_URL', 'http://product-service:8001/api/product')
+from .enums import *
 
 class OrderView(APIView):
     """
@@ -40,27 +38,31 @@ class OrderView(APIView):
             data = get_orders_by_user(user.get('id'), page, per_page)
             if data.get('total_pages') == 0:
                 return Response({"page": page, "per_page": per_page, "total_pages": 0, "content": []}, status=status.HTTP_200_OK)
+            
             total_pages = data.get('total_pages')
-            user_serializer = UserSerializer(data=user)
+            user_serializer = UserSerializer(user)  # Fix here
+
             for order in data.get('content'):
                 order_items = get_order_items_by_order(order.get('id'))
                 address = get_address_by_ward_id(auth_token, order.get('ward_id'), order.get('address'))
-                payment_state = PaymentStateSerializer(data=get_payment_state(auth_token, order.get('payment_state_id')))
-                payment_method = PaymentMethodSerializer(data=get_payment_method(auth_token, order.get('payment_method_id')))
-                order_state = OrderStateSerializer(OrderState.objects.filter(id=order.get('order_state_id')).first())
+                if address:
+                    address.is_valid(raise_exception=True)  # Kiểm tra dữ liệu hợp lệ
+
+                order_state = OrderState.objects.filter(id=order.get('order_state').id).first()
+                order_state_serializer = OrderStateSerializer(order_state) if order_state else None
 
                 order_data = {
                     "id": order.get('id'),
                     "phone_number": order.get('phone_number'),
                     "created_at": order.get('created_at'),
-                    "address": address.data if address.is_valid() else None,
-                    "order_state": order_state.data if order_state.is_valid() else None,
-                    "user": user_serializer.data if user_serializer.is_valid() else None,
-                    "payment_method": payment_method.data if payment_method.is_valid() else None,
-                    "payment_state": payment_state.data if payment_state.is_valid() else None,
+                    "address": address.data if address else None,
+                    "order_state": order_state_serializer.data if order_state_serializer else None,
+                    "user": user_serializer.data,
                     "items": order_items,
                 }
-                content.append(OrderResponseSerializer(data=order_data).data if OrderResponseSerializer(data=order_data).is_valid() else {})
+
+                order_response_serializer = OrderResponseSerializer(order_data)  # Fix here
+                content.append(order_response_serializer.data)
 
         else:
             orders = Order.objects.all()
@@ -70,23 +72,22 @@ class OrderView(APIView):
             for order in orders[start:end]:
                 order_items = get_order_items_by_order(order.id)
                 address = get_address_by_ward_id(auth_token, order.ward_id, order.address)
-                payment_state = PaymentStateSerializer(data=get_payment_state(auth_token, order.payment_state_id))
-                payment_method = PaymentMethodSerializer(data=get_payment_method(auth_token, order.payment_method_id))
-                order_state = OrderStateSerializer(order.order_state)
+
+                order_state_serializer = OrderStateSerializer(order.order_state) if order.order_state else None
                 customer = get_user_by_id(auth_token, order.user_id)
 
                 order_data = {
                     "id": order.id,
                     "phone_number": order.phone_number,
                     "created_at": order.created_at,
-                    "address": address.data if address.is_valid() else None,
-                    "order_state": order_state.data if order_state.is_valid() else None,
-                    "user": customer.data if customer.is_valid() else None,
-                    "payment_method": payment_method.data if payment_method.is_valid() else None,
-                    "payment_state": payment_state.data if payment_state.is_valid() else None,
+                    "address": address.data if address else None,
+                    "order_state": order_state_serializer.data if order_state_serializer else None,
+                    "user": customer.data if customer else None,
                     "items": order_items,
                 }
-                content.append(OrderResponseSerializer(data=order_data).data if OrderResponseSerializer(data=order_data).is_valid() else {})
+
+                order_response_serializer = OrderResponseSerializer(order_data)  # Fix here
+                content.append(order_response_serializer.data)
 
         response_data = {
             "page": page,
@@ -106,44 +107,32 @@ class OrderCreateAPIView(APIView):
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-        auth_token = request.headers.get('AUTHORIZATION')
+        auth_token = request.headers.get('Authorization')
         user = get_user_info(auth_token)
         if not user or not user.get('id'):
             return Response({"detail": "Invalid user data"}, status=status.HTTP_400_BAD_REQUEST)
 
-        payment_state_data = get_payment_state_by_name(auth_token, "Pending")
+        payment_state_data = get_payment_state_by_name(auth_token, PaymentStateEnum.PENDING.value)
         if not payment_state_data:
             return Response({"detail": "Payment state not found"}, status=status.HTTP_400_BAD_REQUEST)
 
         items = serializer.validated_data['items']
-        stock_check_payload = [{"product_id": item['product_id'], "quantity": item['quantity']} for item in items]
-
         product_service_url = f"{PRODUCT_SERVICE_URL}/stock"
-        headers = {"Authorization": f"Bearer {auth_token}", "Content-Type": "application/json"}
-        try:
-            response = httpx.post(product_service_url, json=stock_check_payload, headers=headers)
-            if response.status_code != 200:
-                return Response({"detail": f"Failed to check stock: {response.text}"}, status=status.HTTP_400_BAD_REQUEST)
-
-            stock_data = response.json()
-            for stock_item in stock_data:
-                product_id = stock_item.get('product_id')
-                available_stock = stock_item.get('available_stock', 0)
-                requested_quantity = next(item['quantity'] for item in items if item['product_id'] == product_id)
-                if available_stock < requested_quantity:
-                    return Response(
-                        {"detail": f"Insufficient stock for product {product_id}. Available: {available_stock}"},
-                        status=status.HTTP_400_BAD_REQUEST
-                    )
-        except httpx.RequestError as e:
-            return Response({"detail": f"Failed to connect to product service: {str(e)}"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+        payment_service_url = f"{PAYMENT_SERVICE_URL}"
+        headers = {"Authorization": f"{auth_token}", "Content-Type": "application/json"}
 
         order = Order.objects.create(
             user_id=user.get('id'),
             phone_number=serializer.validated_data['phone_number'],
-            order_state=OrderState.objects.get(name="Pending"),
+            order_state=OrderState.objects.get(name=OrderStateEnum.PENDING.value),
             ward_id=serializer.validated_data['address']['ward_id'],
             address=serializer.validated_data['address']['detail'],
+        )
+
+        OrderStateHistory.objects.create(
+            order=order,
+            order_state=OrderState.objects.get(name=OrderStateEnum.PENDING.value),
+            created_at=order.created_at,
         )
 
         for item in items:
@@ -154,8 +143,11 @@ class OrderCreateAPIView(APIView):
                 price=item['price']
             )
 
-        update_stock_payload = [{"product_id": item['product_id'], "quantity": -item['quantity']} for item in items]
+        update_stock_payload = [{"id": item['product_id'], "quantity": -item['quantity']} for item in items]
         response = httpx.post(product_service_url, json=update_stock_payload, headers=headers)
+
+        create_payment_payload = {"payment_state": payment_state_data[0]["id"], "payment_method": serializer.validated_data['payment_method_id'], "order_id": order.id}
+        response = httpx.post(f"{payment_service_url}", json=create_payment_payload, headers=headers)
         if response.status_code != 200:
             raise Exception(f"Failed to update stock: {response.text}")
 
@@ -166,7 +158,7 @@ class OrderRetrieveDestroyAPIView(APIView):
     API View to retrieve or delete an order.
     """
     def get(self, request, *args, **kwargs):
-        auth_token = request.headers.get('AUTHORIZATION')
+        auth_token = request.headers.get('Authorization')
         user = get_user_info(auth_token)
         if not user:
             return Response({"detail": "Invalid user data"}, status=status.HTTP_400_BAD_REQUEST)
@@ -181,8 +173,6 @@ class OrderRetrieveDestroyAPIView(APIView):
 
         order_items = get_order_items_by_order(order.id)
         address = get_address_by_ward_id(auth_token, order.ward_id, order.address)
-        payment_state = PaymentStateSerializer(data=get_payment_state(auth_token, order.payment_state_id))
-        payment_method = PaymentMethodSerializer(data=get_payment_method(auth_token, order.payment_method_id))
         order_state = OrderStateSerializer(order.order_state)
         customer = get_user_by_id(auth_token, order.user_id)
 
@@ -193,8 +183,6 @@ class OrderRetrieveDestroyAPIView(APIView):
             "address": address.data if address.is_valid() else None,
             "order_state": order_state.data if order_state.is_valid() else None,
             "user": customer.data if customer.is_valid() else None,
-            "payment_method": payment_method.data if payment_method.is_valid() else None,
-            "payment_state": payment_state.data if payment_state.is_valid() else None,
             "items": order_items,
         }
         serializer = OrderResponseSerializer(data=order_data)
@@ -208,7 +196,7 @@ class OrderCancelAPIView(APIView):
     """
     @transaction.atomic
     def post(self, request, *args, **kwargs):
-        auth_token = request.headers.get('AUTHORIZATION')
+        auth_token = request.headers.get('Authorization')
         user = get_user_info(auth_token)
         if not user:
             return Response({"detail": "Invalid user data"}, status=status.HTTP_400_BAD_REQUEST)
@@ -223,7 +211,7 @@ class OrderCancelAPIView(APIView):
 
         order_items = OrderItem.objects.filter(order_id=order_id)
         if not order_items.exists():
-            order.order_state = OrderState.objects.get(name="Cancelled")
+            order.order_state = OrderState.objects.get(name=OrderStateEnum.CANCELLED.value)
             order.save()
             return Response({"detail": "Order cancelled successfully."}, status=status.HTTP_200_OK)
 
@@ -240,7 +228,7 @@ class OrderCancelAPIView(APIView):
             if response.status_code != 200:
                 raise Exception(f"Failed to revert stock: {response.text}")
 
-            order.order_state = OrderState.objects.get(name="Cancelled")
+            order.order_state = OrderState.objects.get(name=OrderStateEnum.CANCELLED.value)
             order.save()
             return Response({"detail": "Order cancelled successfully and stock reverted."}, status=status.HTTP_200_OK)
 
@@ -254,7 +242,7 @@ class OrderStateHistoryView(APIView):
     API View to get order state history
     """
     def get(self, request, *args, **kwargs):
-        auth_token = request.headers.get('AUTHORIZATION')
+        auth_token = request.headers.get('Authorization')
         user = get_user_info(auth_token)
         if not user:
             return Response({"detail": "Invalid user data"}, status=status.HTTP_400_BAD_REQUEST)
@@ -280,7 +268,7 @@ class OrderStateHistoryView(APIView):
 
 class ApproveOrderView(APIView):
     def post(self, request, *args, **kwargs):
-        auth_token = request.headers.get('AUTHORIZATION')
+        auth_token = request.headers.get('Authorization')
         state_serializer = StateSerializer(data=request.data)
         if not state_serializer.is_valid():
             return Response(state_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
