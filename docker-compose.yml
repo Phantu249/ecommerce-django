@@ -5,14 +5,15 @@ services:
     container_name: nginx-gateway
     image: nginx:latest
     ports:
-      - "80:80"  # NGINX lắng nghe trên cổng 80
+      - "80:80"
     volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf  # File cấu hình NGINX
-      - ./product/media:/usr/share/nginx/html/media  # Mount thư mục media vào NGINX
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./product/media:/usr/share/nginx/html/media
     depends_on:
       - user-service
       - product-service
       - cart-service
+      - comment-service  # Thêm comment-service
     restart: always
 
   mongo-product-db:
@@ -27,6 +28,26 @@ services:
       - mongo-product-data:/data/db
     ports:
       - "27017:27017"
+    command: mongod --quiet
+    healthcheck:
+      test: ["CMD", "mongosh", "--username", "${MONGO_USER}", "--password", "${MONGO_PASSWORD}", "--authenticationDatabase", "admin", "--eval", "db.adminCommand('ping')"]
+      interval: 20s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+
+  mongo-comment-db:
+    container_name: mongo-comment-db
+    image: mongo
+    restart: always
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD}
+      MONGO_INITDB_DATABASE: ${COMMENT_MONGO_DB}
+    volumes:
+      - mongo-comment-data:/data/db
+    ports:
+      - "27018:27017"  # Dùng cổng khác để tránh xung đột
     command: mongod --quiet
     healthcheck:
       test: ["CMD", "mongosh", "--username", "${MONGO_USER}", "--password", "${MONGO_PASSWORD}", "--authenticationDatabase", "admin", "--eval", "db.adminCommand('ping')"]
@@ -64,6 +85,12 @@ services:
       - "5432:5432"
     volumes:
       - postgres-cart-data:/var/lib/postgresql/data
+    healthcheck:  # Thêm healthcheck
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
 
   user-service:
     container_name: user-service
@@ -72,7 +99,6 @@ services:
       dockerfile: Dockerfile
     volumes:
       - ./user:/app
-    # Không cần expose port ra ngoài nữa vì NGINX sẽ xử lý
     expose:
       - "8000"
     environment:
@@ -157,7 +183,7 @@ services:
       - PRODUCT_SERVICE_URL=${PRODUCT_SERVICE_URL}
       - PAYMENT_SERVICE_URL=${PAYMENT_SERVICE_URL}
     depends_on:
-      postgres:
+      postgres-cart-db:  # Sửa từ postgres thành postgres-cart-db
         condition: service_healthy
       user-service:
         condition: service_started
@@ -166,7 +192,7 @@ services:
     command: >
       sh -c "python manage.py makemigrations &&
              python manage.py migrate &&
-             python manage.py runserver 0.0.0.0:8002"
+             python manage.py runserver 0.0.0.0:8003"  # Sửa port thành 8003
 
   payment-service:
     build:
@@ -183,13 +209,39 @@ services:
       - POSTGRES_HOST=${PAYMENT_POSTGRES_HOST}
       - POSTGRES_PORT=${PAYMENT_POSTGRES_PORT}
     depends_on:
-      postgres:
+      postgres-cart-db:  # Sửa từ postgres thành postgres-cart-db
         condition: service_healthy
     command: >
       sh -c "python manage.py makemigrations services &&
              python manage.py migrate services &&
-             python manage.py runserver 0.0.0.0:8003"
+             python manage.py runserver 0.0.0.0:8004"  # Sửa port thành 8004
+
+  comment-service:
+    container_name: comment-service
+    build:
+      context: ./comment
+      dockerfile: Dockerfile
+    volumes:
+      - ./comment:/app
+    expose:
+      - "8005"
+    environment:
+      - MONGO_HOST=${COMMENT_MONGO_HOST:-mongo-comment-db}
+      - MONGO_PORT=${COMMENT_MONGO_PORT:-27017}
+      - MONGO_USER=${MONGO_USER}
+      - MONGO_PASSWORD=${MONGO_PASSWORD}
+      - MONGO_DB=${COMMENT_MONGO_DB:-comment_db}
+      - USER_SERVICE_URL=${USER_SERVICE_URL}
+    depends_on:
+      mongo-comment-db:
+        condition: service_healthy
+    command: >
+      sh -c "python manage.py makemigrations &&
+             python manage.py migrate &&
+             python manage.py runserver 0.0.0.0:8005"
+
 volumes:
   mongo-product-data:
+  mongo-comment-data:  # Thêm volume cho comment
   mysql-user-data:
   postgres-cart-data:
