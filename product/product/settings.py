@@ -11,6 +11,8 @@ https://docs.djangoproject.com/en/5.1/ref/settings/
 """
 
 import os
+
+from corsheaders.defaults import default_headers
 from dotenv import load_dotenv
 from pathlib import Path
 load_dotenv()
@@ -30,6 +32,19 @@ DEBUG = True
 
 ALLOWED_HOSTS = ['*']
 
+CORS_ALLOW_ALL_ORIGINS = True  # Chấp nhận tất cả các yêu cầu CORS
+
+CORS_ALLOW_CREDENTIALS = True
+
+CORS_ALLOW_HEADERS = (
+    *default_headers,
+    "ngrok-skip-browser-warning",
+    'Access-Control-Allow-Origin',
+    'Cross-Service'
+)
+CORS_ALLOW_METHODS = ['*']
+
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 #Service url
 USER_SERVICE_URL = os.getenv('USER_SERVICE_URL', 'http://localhost:8000/api/user')
 CART_SERVICE_URL = os.getenv('CART_SERVICE_URL', 'http://localhost:8003/api/cart')
@@ -47,9 +62,11 @@ INSTALLED_APPS = [
     'rest_framework',
     'services',
     'djongo',
+    'corsheaders',
 ]
 
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',

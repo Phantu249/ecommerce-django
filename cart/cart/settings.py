@@ -12,6 +12,8 @@ https://docs.djangoproject.com/en/5.1/ref/settings/
 
 import os
 from pathlib import Path
+
+from corsheaders.defaults import default_headers
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
@@ -31,6 +33,19 @@ SECRET_KEY = 'django-insecure-^%+5sggq$%$=izluflr^am&!!(*@pt9e#6a(5se4r_=ekfy4jh
 DEBUG = True
 
 ALLOWED_HOSTS = ['*']
+CORS_ALLOW_ALL_ORIGINS = True  # Chấp nhận tất cả các yêu cầu CORS
+
+CORS_ALLOW_CREDENTIALS = True
+
+CORS_ALLOW_HEADERS = (
+    *default_headers,
+    "ngrok-skip-browser-warning",
+    'Access-Control-Allow-Origin',
+    'Cross-Service'
+)
+CORS_ALLOW_METHODS = ['*']
+
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
 USER_SERVICE_URL = os.getenv('USER_SERVICE_URL', 'http://user-service:8000/api/user')
 PRODUCT_SERVICE_URL = os.getenv('PRODUCT_SERVICE_URL', 'http://product-service:8001/api/product')
@@ -46,9 +61,11 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',
     'services',
+    'corsheaders',
 ]
 
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
