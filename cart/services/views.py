@@ -87,6 +87,7 @@ class CartView(APIView):
 class CartItemDeleteView(APIView):
     permission_classes = [IsAuth]
 
+    @atomic
     def delete(self, request, product_id):
         user_id = request.user['id']
         try:
@@ -101,6 +102,7 @@ class CartItemDeleteView(APIView):
 class CartToOrderView(APIView):
     permission_classes = [IsAuth]
 
+    @atomic
     def post(self, request):
         user_id = request.user['id']
         data = request.data

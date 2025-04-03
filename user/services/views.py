@@ -14,6 +14,7 @@ from .serializers import UserSerializer, UserUpdateSerializer, AddressSerializer
 class LoginView(APIView):
     permission_classes = [AllowAny]
 
+    @atomic
     def post(self, request):
         username = request.data.get('username')
         password = request.data.get('password')
@@ -85,6 +86,7 @@ class UpdateUserInfoView(APIView):
 class ChangePasswordView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @atomic
     def post(self, request):
         user = request.user
         old_password = request.data.get('old_password')

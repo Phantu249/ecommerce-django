@@ -1,6 +1,7 @@
 from http.client import responses
 
 from django.contrib.messages import success
+from django.db.transaction import atomic
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -24,6 +25,7 @@ class ProductDetailView(APIView):
         except Product.DoesNotExist:
             return Response(status=status.HTTP_404_NOT_FOUND)
 
+    @atomic
     def patch(self, request, id):
         permission_classes = [IsAdminRole]
 
@@ -73,6 +75,7 @@ class ProductListView(APIView):
             'total_pages': paginator.num_pages
         }, status=status.HTTP_200_OK)
 
+    @atomic
     def post(self, request):
         permission_classes = [IsAdminRole]
         serializer = ProductCreateUpdateSerializer(data=request.data, context={'request': request})
@@ -81,6 +84,7 @@ class ProductListView(APIView):
             return Response(ProductSerializer(product, context={'request': request}).data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+    @atomic
     def delete(self, request):
         permission_classes = [IsAdminRole]
 
@@ -114,6 +118,7 @@ class CategoryListView(APIView):
         serializer = CategorySerializer(categories, many=True)
         return Response(serializer.data)
 
+    @atomic
     def post(self, request):
         permission_classes = [IsAdminRole]
 
@@ -126,6 +131,7 @@ class CategoryListView(APIView):
         except ValueError as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
+    @atomic
     def delete(self, request):
         permission_classes = [IsAdminRole]
         list_category_id = request.data
@@ -152,6 +158,7 @@ class CategoryListView(APIView):
 
 class CategoryDetailView(APIView):
 
+    @atomic
     def delete(self, request, id):
         permission_classes = [IsAdminRole]
         try:
@@ -161,6 +168,7 @@ class CategoryDetailView(APIView):
         except Category.DoesNotExist:
             return Response(status=status.HTTP_404_NOT_FOUND)
 
+    @atomic
     def put(self, request, id):
         permission_classes = [IsAdminRole]
 
@@ -179,6 +187,7 @@ class CategoryDetailView(APIView):
 class ProductStockView(APIView):
     permission_classes = [IsAdminRole]
 
+    @atomic
     def patch(self, request, id):
         try:
             product = Product.objects.get(id=int(id))
