@@ -27,9 +27,9 @@ class LoginView(APIView):
                     'token': str(refresh.access_token)
                 }, status=status.HTTP_200_OK)
             else:
-                return Response({'error': 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
+                return Response({'error': 'Invalid username or password'}, status=status.HTTP_401_UNAUTHORIZED)
         except User.DoesNotExist:
-            return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+            return Response({'error': "Account does not exist" }, status=status.HTTP_401_UNAUTHORIZED)
 
 class RegisterView(APIView):
     permission_classes = [AllowAny]

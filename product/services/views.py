@@ -69,7 +69,7 @@ class ProductListView(APIView):
 
         serializer = ProductSerializer(page_obj, many=True, context={'request': request})
         return Response({
-            'products': serializer.data,
+            'items': serializer.data,
             'per_page': per_page,
             'page': page,
             'total_pages': paginator.num_pages
