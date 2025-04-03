@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from django.conf import settings
 import os
-
+import uuid
 from urllib3 import request
 
 from .models import Product, ProductImage, Category
@@ -93,12 +93,18 @@ class ProductCreateUpdateSerializer(serializers.ModelSerializer):
 
         # Lưu ảnh vào media/product_images
         for image in product_images:
-            file_path = os.path.join(settings.MEDIA_ROOT, 'product_images', image.name)
+            # Tạo tên file mới với UUID
+            file_extension = os.path.splitext(image.name)[1]  # Lấy phần mở rộng (.jpg, .png, ...)
+            new_filename = f"{uuid.uuid4().hex}{file_extension}"  # Tạo tên mới bằng UUID
+
+            # file_path = os.path.join(settings.MEDIA_ROOT, 'product_images', image.name)
+            file_path = os.path.join(settings.MEDIA_ROOT, 'product_images', new_filename)
+            # Tạo thư mục nếu chưa tồn tại
             os.makedirs(os.path.dirname(file_path), exist_ok=True)
             with open(file_path, 'wb+') as destination:
                 for chunk in image.chunks():
                     destination.write(chunk)
-            ProductImage.create(product_id=product.id, path=image.name)
+            ProductImage.create(product_id=product.id, path=new_filename)
         return product
 
     def update(self, instance, validated_data):
